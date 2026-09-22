@@ -1,5 +1,5 @@
 {
-  "channel1": [
+  "channel5": [
     {
       "name": "NTV (M3U8)",
       "url": "https://zabava-htlive.cdn.ngenix.net/hls/CH_NTV/variant.m3u8",
@@ -20,13 +20,51 @@
       "url": "https://cdn.ntv.ru/ntv0_foreign/index.m3u8",
       "type": "m3u8"
     }
-
   ],
-  "channel2": [
+  "channel19": [
     {
-      "name": "Utama",
-      "url": "https://cdn.ntv.ru/ntv0_foreign/index.m3u8",
+      "name": "Server1",
+      "url": "https://zabava-htlive.cdn.ngenix.net/hls/CH_RENTV/variant.m3u8",
       "type": "m3u8"
+    },
+    {
+      "name": "Server2",
+      "url": "https://player.mediavitrina.ru/rentv_v2/rentv/smotret_tv_web/player.html",
+      "type": "web"
+    }
+  ],
+  "channel16": [
+    {
+      "name": "Server1",
+      "url": "https://hls-mirtv.cdnvideo.ru/mirtv-parampublish/mirtv_2500/playlist.m3u8",
+      "type": "m3u8"
+    },
+    {
+      "name": "Server2",
+      "url": "https://ok.ru/videoembed/10050368183868?autoplay=1",
+      "type": "web"
+    },
+    {
+      "name": "Server3",
+      "url": "https://vkvideo.ru/video_ext.php?oid=-184488005&id=456239363&hd=4",
+      "type": "web"
+    }
+  ],
+  "channel7": [
+    {
+      "name": "Server1",
+      "url": "https://tvchannelstream1.tvzvezda.ru/cdn/tvzvezda/playlist.m3u8",
+      "type": "m3u8"
+    },
+    {
+      "name": "Server2",
+      "url": "https://tvzvezda.bonus-tv.ru/cdn/tvzvezda/playlist.m3u8",
+      "type": "m3u8"
+    },
+    {
+      "name": "Server3",
+      "url": "https://rutube.ru/play/embed/5ab908fccfac5bb43ef2b1e4182256b0",
+      "type": "web"
     }
   ]
 }
