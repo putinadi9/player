@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Stream Web Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000; overflow: hidden; font-family: sans-serif;
+        }
+        #video-container { width: 100%; height: 100%; position: relative; }
+        
+        video { width: 100%; height: 100%; object-fit: contain; }
+        
+        #iframe-player {
+            width: 100%; height: 100%; border: none; display: none; background-color: #000;
+        }
+
+        #hover-catcher {
+            position: absolute; top: 0; left: 0; width: 100%; height: 40px; z-index: 4;
+        }
+
+        #custom-ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; transition: opacity 0.3s ease, visibility 0.3s ease; 
+            z-index: 5; opacity: 0; visibility: hidden;
+        }
+        #custom-ui.show {
+            opacity: 1; visibility: visible;
+        }
+
+        /* --- SOLUSI IFRAME --- */
+        .iframe-active #custom-ui {
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+        .iframe-active #server-btn {
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+        .iframe-active #custom-ui.show #server-btn,
+        .iframe-active #server-dropdown.active #server-btn,
+        .iframe-active #server-dropdown:hover #server-btn {
+            opacity: 1;
+        }
+
+        .dropdown { position: absolute; pointer-events: auto; }
+        .dropdown-content {
+            display: none; position: absolute; background-color: rgba(0, 0, 0, 0.85);
+            min-width: 110px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+            border-radius: 5px; overflow: hidden; flex-direction: column; z-index: 6;
+        }
+        .dropdown.active .dropdown-content { display: flex; }
+        .dropdown-btn {
+            background-color: rgba(0, 0, 0, 0.6); color: white; padding: 10px 15px;
+            font-size: 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px;
+            cursor: pointer; backdrop-filter: blur(4px); transition: background 0.2s, opacity 0.3s; font-weight: bold;
+        }
+        .dropdown-btn:hover { background-color: rgba(0, 0, 0, 0.9); }
+        .dropdown-item {
+            color: white; padding: 12px 16px; text-decoration: none; display: block;
+            cursor: pointer; border: none; background: none; text-align: left;
+            font-size: 14px; width: 100%; box-sizing: border-box; transition: background 0.2s;
+        }
+        .dropdown-item:hover { background-color: rgba(255, 255, 255, 0.2); }
+        .dropdown-item.active { color: #e50914; font-weight: bold; }
+        .top-right { top: 20px; right: 20px; }
+        .top-right .dropdown-content { right: 0; top: 100%; margin-top: 5px; }
+        .bottom-right { bottom: 70px; right: 20px; }
+        .bottom-right .dropdown-content { right: 0; bottom: 100%; margin-bottom: 5px; }
+        
+        #error-overlay {
+            display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); color: white; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10; pointer-events: auto;
+        }
+        .server-btn-error {
+            background: #e50914; color: white; border: none; padding: 15px 30px;
+            margin: 10px; font-size: 16px; border-radius: 5px; cursor: pointer;
+            width: 80%; max-width: 300px; text-align: center; transition: background 0.2s;
+        }
+        .server-btn-error:hover { background: #f40612; }
+        #error-overlay h3 { margin-bottom: 10px; font-weight: normal; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="video-container">
+    <div id="hover-catcher"></div>
+
+    <video id="video" controls autoplay playsinline></video>
+    
+    <iframe id="iframe-player" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+    
+    <div id="custom-ui">
+        <div class="dropdown top-right" id="server-dropdown">
+            <button class="dropdown-btn" id="server-btn">Сервер</button>
+            <div class="dropdown-content" id="server-list"></div>
+        </div>
+        <div class="dropdown bottom-right" id="quality-dropdown">
+            <button class="dropdown-btn" id="quality-btn">Авто</button>
+            <div class="dropdown-content" id="quality-list">
+                <button class="dropdown-item active">Авто</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="error-overlay">
+        <h3>Ошибка потока. Пожалуйста, выберите альтернативный сервер:</h3>
+        <div id="error-server-list"></div>
+    </div>
+</div>
+
+<script>
+    let sources = [];
+    let currentSourceIndex = 0;
+    
+    const video = document.getElementById('video');
+    const iframe = document.getElementById('iframe-player');
+    const container = document.getElementById('video-container');
+    const hoverCatcher = document.getElementById('hover-catcher');
+    const customUI = document.getElementById('custom-ui');
+    const errorOverlay = document.getElementById('error-overlay');
+    const errorServerList = document.getElementById('error-server-list');
+    
+    const serverBtn = document.getElementById('server-btn');
+    const serverList = document.getElementById('server-list');
+    const qualityBtn = document.getElementById('quality-btn');
+    const qualityList = document.getElementById('quality-list');
+    const qualityDropdown = document.getElementById('quality-dropdown');
+    
+    let hls;
+    let uiTimeout;
+
+    // --- UI LOGIC ---
+    function showUI() {
+        customUI.classList.add('show');
+        clearTimeout(uiTimeout);
+        uiTimeout = setTimeout(() => {
+            customUI.classList.remove('show');
+            document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+        }, 3000); 
+    }
+
+    container.addEventListener('mousemove', showUI);
+    container.addEventListener('touchstart', showUI);
+    container.addEventListener('click', (e) => {
+        document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+        showUI();
+    });
+    
+    hoverCatcher.addEventListener('mouseenter', showUI);
+    hoverCatcher.addEventListener('touchstart', showUI);
+
+    document.querySelectorAll('.dropdown-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const parent = btn.parentElement;
+            const isActive = parent.classList.contains('active');
+            document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+            if (!isActive) parent.classList.add('active');
+            showUI();
+        };
+    });
+
+    function setupServerMenu() {
+        serverList.innerHTML = '';
+        if (sources.length <= 1) {
+            document.getElementById('server-dropdown').style.display = 'none';
+        } else {
+            document.getElementById('server-dropdown').style.display = 'block';
+        }
+
+        sources.forEach((source, index) => {
+            const btn = document.createElement('button');
+            btn.className = `dropdown-item ${index === currentSourceIndex ? 'active' : ''}`;
+            btn.innerText = source.name;
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                document.getElementById('server-dropdown').classList.remove('active');
+                if (index !== currentSourceIndex) loadVideo(index);
+            };
+            serverList.appendChild(btn);
+        });
+        if(sources[currentSourceIndex]) serverBtn.innerText = sources[currentSourceIndex].name;
+    }
+
+    function updateQualityMenu(levels) {
+        qualityList.innerHTML = '';
+        const isAuto = hls.currentLevel === -1;
+        const autoBtn = document.createElement('button');
+        autoBtn.className = `dropdown-item ${isAuto ? 'active' : ''}`;
+        autoBtn.innerText = 'Авто';
+        autoBtn.onclick = (e) => {
+            e.stopPropagation();
+            hls.currentLevel = -1;
+            qualityBtn.innerText = 'Авто';
+            qualityDropdown.classList.remove('active');
+            updateQualityMenu(levels);
+            showUI();
+        };
+        qualityList.appendChild(autoBtn);
+
+        levels.forEach((level, index) => {
+            const btn = document.createElement('button');
+            const resolutionText = level.height ? `${level.height}p` : `Качество ${index+1}`;
+            btn.className = `dropdown-item ${hls.currentLevel === index ? 'active' : ''}`;
+            btn.innerText = resolutionText;
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                hls.currentLevel = index;
+                qualityBtn.innerText = resolutionText;
+                qualityDropdown.classList.remove('active');
+                updateQualityMenu(levels);
+                showUI();
+            };
+            qualityList.appendChild(btn);
+        });
+
+        if (hls.autoLevelEnabled) {
+            qualityBtn.innerText = 'Авто';
+        } else {
+            const activeLevel = levels[hls.currentLevel];
+            qualityBtn.innerText = activeLevel && activeLevel.height ? `${activeLevel.height}p` : 'Авто';
+        }
+    }
+
+    function renderErrorButtons() {
+        errorServerList.innerHTML = '';
+        if (sources.length <= 1) {
+            const btn = document.createElement('button');
+            btn.className = 'server-btn-error';
+            btn.innerText = 'Повторить попытку';
+            btn.onclick = () => {
+                errorOverlay.style.display = 'none';
+                loadVideo(currentSourceIndex);
+            };
+            errorServerList.appendChild(btn);
+            return;
+        }
+
+        sources.forEach((source, index) => {
+            if (index !== currentSourceIndex) {
+                const btn = document.createElement('button');
+                btn.className = 'server-btn-error';
+                btn.innerText = `Переключить на ${source.name}`;
+                btn.onclick = () => {
+                    errorOverlay.style.display = 'none';
+                    loadVideo(index);
+                };
+                errorServerList.appendChild(btn);
+            }
+        });
+    }
+
+    function showErrorOverlay() {
+        renderErrorButtons();
+        errorOverlay.style.display = 'flex';
+    }
+    
+    function showFatalError(title, desc) {
+        errorOverlay.style.display = 'flex';
+        errorOverlay.innerHTML = `
+            <h3 style="color: #e50914; font-weight: bold; font-size: 24px;">${title}</h3>
+            <p style="color: #ccc; margin-bottom: 20px; font-size: 16px;">${desc}</p>
+        `;
+        customUI.style.display = 'none';
+    }
+
+    // --- MAIN PLAYER LOGIC ---
+    function loadVideo(index) {
+        currentSourceIndex = index;
+        if (!sources[index]) return;
+
+        const source = sources[index];
+        const url = source.url;
+        const type = source.type || 'm3u8';
+        
+        setupServerMenu();
+
+        if (hls) {
+            hls.destroy();
+        }
+
+        if (type === 'web') {
+            container.classList.add('iframe-active');
+            video.style.display = 'none';
+            iframe.style.display = 'block';
+            qualityDropdown.style.display = 'none';
+            
+            video.pause();
+            video.src = '';
+            iframe.src = url;
+
+        } else {
+            container.classList.remove('iframe-active');
+            video.style.display = 'block';
+            iframe.style.display = 'none';
+            iframe.src = '';
+
+            if (Hls.isSupported()) {
+                qualityDropdown.style.display = 'block';
+                hls = new Hls({ maxLoadingDelay: 4, manifestLoadingTimeOut: 10000, manifestLoadingMaxRetry: 1 });
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
+                    video.play().catch(e => console.log("Автовоспроизведение заблокировано", e));
+                    updateQualityMenu(data.levels);
+                });
+
+                hls.on(Hls.Events.LEVEL_SWITCHED, function(event, data) {
+                    if(hls.autoLevelEnabled) {
+                        const level = hls.levels[data.level];
+                        const text = level && level.height ? `Авто (${level.height}p)` : 'Авто';
+                        qualityBtn.innerText = text;
+                    }
+                });
+
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    if (data.fatal) {
+                        console.error("Ошибка HLS:", data.type);
+                        showErrorOverlay();
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', function() {
+                    video.play().catch(e => console.log("Автовоспроизведение заблокировано", e));
+                });
+                qualityDropdown.style.display = 'none';
+                video.onerror = function() {
+                    console.error("Ошибка нативного видео");
+                    showErrorOverlay();
+                };
+            }
+        }
+    }
+
+
+    // --- URL PARAMETER LOGIC ---
+    function initPlayer() {
+        if (sources.length > 0) {
+            loadVideo(0);
+            showUI();
+        }
+    }
+
+    function loadDefaultSources() {
+        sources = [
+            { name: "Сервер НТВ", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_NTV/variant.m3u8", type: "m3u8" },
+            { name: "Сервер Skynet", url: "https://streaming.skynetconnect.co.za/live/213.m3u8", type: "m3u8" },
+            { name: "Сервер CDN", url: "https://cdn.ntv.ru/ntv0_foreign/index.m3u8", type: "m3u8" }
+        ];
+    }
+
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has('channel') || params.has('')) {
+        const channelId = params.get('channel') || params.get('');
+        fetch('channels.json?t=' + new Date().getTime())
+            .then(res => res.json())
+            .then(data => {
+                if (data[channelId]) {
+                    sources = data[channelId];
+                    initPlayer();
+                } else {
+                    showFatalError('Ошибка: Канал не найден', `Канал "${channelId}" не найден в базе данных.`);
+                }
+            })
+            .catch(err => {
+                console.error("Ошибка загрузки channels.json", err);
+                showFatalError('Ошибка базы данных', 'Не удалось загрузить файл конфигурации channels.json.');
+            });
+    } 
+    else {
+        loadDefaultSources();
+        initPlayer();
+    }
+</script>
+</body>
+</html>

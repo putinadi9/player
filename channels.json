@@ -1,0 +1,32 @@
+{
+  "channel1": [
+    {
+      "name": "NTV (M3U8)",
+      "url": "https://zabava-htlive.cdn.ngenix.net/hls/CH_NTV/variant.m3u8",
+      "type": "m3u8"
+    },
+    {
+      "name": "Skynet (M3U8)",
+      "url": "https://streaming.skynetconnect.co.za/live/213.m3u8",
+      "type": "m3u8"
+    },
+    {
+      "name": "OK.RU",
+      "url": "https://ok.ru/videoembed/10076961578583?autoplay=1",
+      "type": "web"
+    },
+    {
+      "name": "CDN",
+      "url": "https://cdn.ntv.ru/ntv0_foreign/index.m3u8",
+      "type": "m3u8"
+    }
+
+  ],
+  "channel2": [
+    {
+      "name": "Utama",
+      "url": "https://cdn.ntv.ru/ntv0_foreign/index.m3u8",
+      "type": "m3u8"
+    }
+  ]
+}
