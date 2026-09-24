@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Live Stream Web Player</title>
-    <script src="https://putinadi9.github.io/player/hls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -75,14 +75,24 @@
             display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.85); color: white; flex-direction: column;
             justify-content: center; align-items: center; z-index: 10; pointer-events: auto;
+            padding: 20px; box-sizing: border-box; overflow-y: auto; text-align: center;
+        }
+        #error-server-list {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+            width: 100%; max-width: 600px; margin-top: 15px;
         }
         .server-btn-error {
-            background: #e50914; color: white; border: none; padding: 15px 30px;
-            margin: 10px; font-size: 16px; border-radius: 5px; cursor: pointer;
-            width: 80%; max-width: 300px; text-align: center; transition: background 0.2s;
+            background: #e50914; color: white; border: none; padding: 12px 15px;
+            margin: 0; font-size: 14px; border-radius: 5px; cursor: pointer;
+            width: auto; flex: 1 1 45%; max-width: 250px; min-width: 140px;
+            text-align: center; transition: background 0.2s, transform 0.1s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-sizing: border-box; font-weight: bold;
         }
-        .server-btn-error:hover { background: #f40612; }
-        #error-overlay h3 { margin-bottom: 10px; font-weight: normal; text-align: center; }
+        .server-btn-error:hover { background: #f40612; transform: scale(1.02); }
+        .server-btn-error.retry-btn { background: #495057; }
+        .server-btn-error.retry-btn:hover { background: #6c757d; }
+        #error-overlay h3 { margin: 0 0 10px 0; font-weight: bold; font-size: 18px; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -229,29 +239,24 @@
 
     function renderErrorButtons() {
         errorServerList.innerHTML = '';
-        if (sources.length <= 1) {
+        
+        sources.forEach((source, index) => {
             const btn = document.createElement('button');
-            btn.className = 'server-btn-error';
-            btn.innerText = 'Повторить попытку';
+            
+            if (index === currentSourceIndex) {
+                btn.className = 'server-btn-error retry-btn';
+                btn.innerHTML = `🔄 Повторить: ${source.name}`;
+            } else {
+                btn.className = 'server-btn-error';
+                btn.innerHTML = `▶ ${source.name}`;
+            }
+            
             btn.onclick = () => {
                 errorOverlay.style.display = 'none';
-                loadVideo(currentSourceIndex);
+                loadVideo(index);
             };
+            
             errorServerList.appendChild(btn);
-            return;
-        }
-
-        sources.forEach((source, index) => {
-            if (index !== currentSourceIndex) {
-                const btn = document.createElement('button');
-                btn.className = 'server-btn-error';
-                btn.innerText = `Переключить на ${source.name}`;
-                btn.onclick = () => {
-                    errorOverlay.style.display = 'none';
-                    loadVideo(index);
-                };
-                errorServerList.appendChild(btn);
-            }
         });
     }
 
