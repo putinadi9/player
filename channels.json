@@ -52,7 +52,7 @@
   ],
   "channel7": [
     {
-      "name": "Server1",
+      "name": "Server 1",
       "url": "https://tvchannelstream1.tvzvezda.ru/cdn/tvzvezda/playlist.m3u8",
       "type": "m3u8"
     },
